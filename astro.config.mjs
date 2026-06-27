@@ -8,6 +8,6 @@ export default defineConfig({
       enabled: true,
     },
     imageService: 'passthrough',
-    sessionKVBindingName: undefined,
+    sessionKVBindingName: false,
   }),
 });
