@@ -1,0 +1,82 @@
+---
+interface Sighting {
+  id: number;
+  location: string;
+  lat: number | null;
+  lng: number | null;
+}
+
+interface Props {
+  sightings: Sighting[];
+}
+
+const { sightings } = Astro.props;
+const mapped = sightings.filter(s => s.lat && s.lng);
+---
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<div id="journey-map"></div>
+
+<script define:vars={{ mapped }}>
+  function initMap() {
+    if (typeof L === 'undefined') {
+      setTimeout(initMap, 100);
+      return;
+    }
+
+    const map = L.map('journey-map', {
+      zoomControl: true,
+      scrollWheelZoom: false,
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO',
+    maxZoom: 19,
+    }).addTo(map);
+
+    const coords = mapped.map(s => [s.lat, s.lng]);
+
+    if (coords.length > 1) {
+      L.polyline(coords, {
+        color: '#7a4a2e',
+        weight: 1.5,
+        opacity: 0.6,
+        dashArray: '4 6',
+      }).addTo(map);
+    }
+
+    mapped.forEach((s, i) => {
+      const isLast = i === mapped.length - 1;
+      L.circleMarker([s.lat, s.lng], {
+        radius: 5,
+        fillColor: isLast ? '#7a4a2e' : '#f7f4ef',
+        color: '#7a4a2e',
+        weight: 1.5,
+        fillOpacity: 1,
+      }).addTo(map).bindPopup(
+        `<span style="font-family: 'IM Fell English', Georgia, serif; font-size: 14px;">${s.location}</span>`
+      );
+    });
+
+    if (coords.length > 1) {
+      map.fitBounds(coords, { padding: [32, 32] });
+    } else if (coords.length === 1) {
+      map.setView(coords[0], 10);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', initMap);
+</script>
+
+<style>
+  #journey-map {
+    width: 100%;
+    height: 280px;
+    border-radius: 6px;
+    border: 0.5px solid var(--divider);
+    margin-bottom: 32px;
+    background: var(--bg);
+  }
+</style>

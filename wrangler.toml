@@ -1,0 +1,12 @@
+name = "youfoundthis"
+compatibility_date = "2024-04-03"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "youfoundthis"
+database_id = "0f888933-5557-4ef8-a31b-32684a62cc25"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "youfoundthis-photos"

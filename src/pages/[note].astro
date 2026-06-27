@@ -1,0 +1,137 @@
+---
+import Base from '../layouts/Base.astro';
+import Timeline from '../components/Timeline.astro';
+import SubmissionForm from '../components/SubmissionForm.astro';
+import JourneyMap from '../components/JourneyMap.astro';
+
+const { note } = Astro.params;
+import { env } from 'cloudflare:workers';
+const db = env.DB;
+
+const noteData = await db.prepare(
+  'SELECT * FROM notes WHERE id = ?'
+).bind(note).first();
+
+if (!noteData) {
+  return Astro.redirect('/404');
+}
+
+const result = await db.prepare(
+  'SELECT * FROM sightings WHERE note_id = ? ORDER BY created_at ASC'
+).bind(note).all();
+
+const sightings = result.results as any[];
+const origin = sightings[0];
+---
+
+<Base title={`note ${note} — youfoundthis.club`}>
+  <main>
+
+    <header>
+      <span class="site-name">youfoundthis.club</span>
+      <span class="note-number">note {note}</span>
+    </header>
+
+    <section class="note-text">
+      <p>
+        Hello friend, you found my note. In a world where we can connect more readily
+        than ever, we aren't reaching out to each other. This note was originally left
+        in Venice, Italy — for you, or whoever found it first. Add something. Leave it
+        somewhere. Visit youfoundthis.club/{note} to see where it's been.
+      </p>
+    </section>
+
+<p class="origin-line">
+  Originally left in {noteData.origin_location} · {noteData.origin_date}
+</p>
+
+<JourneyMap sightings={sightings} />
+
+<hr />
+
+<Timeline sightings={sightings} />
+
+<hr />
+
+<section class="cta">
+      <h2>You're part of this now.</h2>
+    </section>
+
+    <SubmissionForm note={note} />
+
+    <footer>
+      <span>youfoundthis.club</span>
+    </footer>
+
+  </main>
+</Base>
+
+<style>
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 40px;
+  }
+
+  .site-name {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--site-name);
+    text-transform: lowercase;
+  }
+
+  .note-number {
+    font-family: 'IM Fell English', Georgia, serif;
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  .note-text {
+    margin-bottom: 24px;
+  }
+
+  .note-text p {
+    font-family: 'IM Fell English', Georgia, serif;
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+
+  .origin-line {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 32px;
+  }
+
+  hr {
+    border: none;
+    border-top: 0.5px solid var(--divider);
+    margin: 32px 0;
+  }
+
+  .cta h2 {
+    font-family: 'IM Fell English', Georgia, serif;
+    font-size: 24px;
+    color: var(--ink);
+    font-weight: normal;
+    margin-bottom: 32px;
+  }
+
+  footer {
+    margin-top: 80px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--site-name);
+    text-align: center;
+  }
+</style>

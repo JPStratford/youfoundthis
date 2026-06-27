@@ -1,0 +1,231 @@
+---
+interface Sighting {
+  id: number;
+  location: string;
+  message: string | null;
+  name: string | null;
+  created_at: string | null;
+  photo_key: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
+interface Props {
+  sightings: Sighting[];
+}
+
+const { sightings } = Astro.props;
+
+function photoUrl(key: string): string {
+  // key is "sightings/29/uuid.jpg" — strip "sightings/" prefix
+  const stripped = key.replace(/^sightings\//, '');
+  return `/api/photos/${stripped}`;
+}
+---
+
+<section class="timeline">
+  <p class="section-label">where it's been</p>
+
+  <div class="stops">
+    {sightings.map((s, i) => (
+      <div class="stop">
+        <div class="marker">
+          <div class="dot filled" />
+          {i < sightings.length - 1 && <div class="line" />}
+        </div>
+        <div class="content">
+          <p class="place">{s.location}</p>
+          <p class="meta">{s.created_at ? new Date(s.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : ''}{s.name ? ` · ${s.name}` : ''}</p>
+          {s.message && <p class="message">{s.message}</p>}
+            {s.photo_key && (
+            <img
+                src={photoUrl(s.photo_key)}
+                alt={`Photo from ${s.location}`}
+                class="sighting-photo"
+                data-lightbox={photoUrl(s.photo_key)}
+            />
+            )}
+        </div>
+      </div>
+    ))}
+
+    <div class="stop">
+      <div class="marker">
+        <div class="dot empty" />
+      </div>
+      <div class="content">
+        <p class="place you">You.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="lightbox" id="lightbox">
+  <span class="lightbox-close">close</span>
+  <img src="" alt="" id="lightbox-img" />
+</div>
+
+<script>
+  const lightbox = document.getElementById('lightbox') as HTMLDivElement;
+  const lightboxImg = document.getElementById('lightbox-img') as HTMLImageElement;
+
+  document.querySelectorAll('[data-lightbox]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const src = (el as HTMLElement).dataset.lightbox || '';
+      lightboxImg.src = src;
+      lightbox.classList.add('active');
+    });
+  });
+
+  lightbox.addEventListener('click', () => {
+    lightbox.classList.remove('active');
+    lightboxImg.src = '';
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      lightbox.classList.remove('active');
+      lightboxImg.src = '';
+    }
+  });
+</script>
+</section>
+
+<style>
+  .timeline {
+    margin-bottom: 8px;
+  }
+
+  .section-label {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .stops {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stop {
+    display: flex;
+    gap: 20px;
+    position: relative;
+  }
+
+  .marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    width: 12px;
+    padding-top: 4px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot.filled {
+    background: var(--accent);
+  }
+
+  .dot.empty {
+    background: transparent;
+    border: 1.5px solid var(--placeholder);
+  }
+
+  .line {
+    width: 1px;
+    flex-grow: 1;
+    background: var(--divider);
+    margin: 4px 0;
+    min-height: 24px;
+  }
+
+  .content {
+    padding-bottom: 28px;
+  }
+
+  .place {
+    font-family: 'IM Fell English', Georgia, serif;
+    font-size: 16px;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .place.you {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .meta {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .message {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    font-style: italic;
+    color: var(--body);
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+
+  .sighting-photo {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    border-radius: 4px;
+    border: 0.5px solid var(--divider);
+    margin-top: 8px;
+    cursor: pointer;
+  }
+
+  .sighting-photo:hover {
+    opacity: 0.9;
+  }
+
+  .lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 23, 20, 0.92);
+    z-index: 1000;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lightbox.active {
+    display: flex;
+  }
+
+  .lightbox img {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 4px;
+    object-fit: contain;
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #c4b8ac;
+    cursor: pointer;
+  }
+
+</style>

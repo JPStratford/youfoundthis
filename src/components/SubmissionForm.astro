@@ -1,0 +1,445 @@
+---
+interface Props {
+  note: string | undefined;
+}
+
+const { note } = Astro.props;
+---
+
+<section class="form-section">
+  <form id="sighting-form">
+    <input type="hidden" name="note" value={note} />
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<div class="field">
+  <label for="location">Where did you find it?</label>
+  <input
+    type="text"
+    id="location"
+    name="location"
+    placeholder="City, place, or just a description"
+    required
+  />
+  <p class="geocode-result" id="geocode-result"></p>
+  <div id="location-map" class="location-map hidden"></div>
+  <div id="location-confirm" class="location-confirm hidden">
+    <button type="button" id="confirm-yes">Yes, that's right</button>
+    <button type="button" id="confirm-no">No, let me change it</button>
+  </div>
+</div>
+
+    <div class="field">
+      <label for="name">Your name <span class="optional">optional</span></label>
+      <input
+        type="text"
+        id="name"
+        name="name"
+        placeholder="Or leave it anonymous"
+      />
+    </div>
+
+    <div class="field">
+      <label for="message">Add a line <span class="optional">optional</span></label>
+      <textarea
+        id="message"
+        name="message"
+        rows="3"
+        placeholder="Something you want to say"
+      ></textarea>
+    </div>
+
+    <div class="field">
+      <label for="photo">Photo <span class="optional">optional</span></label>
+      <input
+        type="file"
+        id="photo"
+        name="photo"
+        accept="image/*"
+      />
+    </div>
+
+    <button type="submit">Add my sighting →</button>
+
+    <p class="status" id="form-status"></p>
+  </form>
+</section>
+
+<script>
+  import imageCompression from 'browser-image-compression';
+
+  const form = document.getElementById('sighting-form') as HTMLFormElement;
+  const status = document.getElementById('form-status') as HTMLParagraphElement;
+  const photoInput = document.getElementById('photo') as HTMLInputElement;
+  const locationInput = document.getElementById('location') as HTMLInputElement;
+  const geocodeResult = document.getElementById('geocode-result') as HTMLParagraphElement;
+  const locationMap = document.getElementById('location-map') as HTMLDivElement;
+  const locationConfirm = document.getElementById('location-confirm') as HTMLDivElement;
+  const confirmYes = document.getElementById('confirm-yes') as HTMLButtonElement;
+  const confirmNo = document.getElementById('confirm-no') as HTMLButtonElement;
+  const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+  let resolvedCoords: { lat: number; lng: number } | null = null;
+  let locationConfirmed = false;
+  let miniMap: any = null;
+  let miniMarker: any = null;
+
+  function setSubmitState() {
+    // Allow submit if: location is empty (no coords intended) or location is confirmed
+    const locationEmpty = locationInput.value.trim() === '';
+    submitButton.disabled = !locationEmpty && !locationConfirmed;
+  }
+
+  function resetLocation() {
+    resolvedCoords = null;
+    locationConfirmed = false;
+    geocodeResult.textContent = '';
+    geocodeResult.className = 'geocode-result';
+    locationMap.classList.add('hidden');
+    locationConfirm.classList.add('hidden');
+    confirmYes.classList.remove('confirmed');
+    setSubmitState();
+  }
+
+  function initMiniMap(lat: number, lng: number) {
+    locationMap.classList.remove('hidden');
+
+    if (!miniMap) {
+      // @ts-ignore
+      miniMap = L.map('location-map', {
+        zoomControl: false,
+        scrollWheelZoom: false,
+        dragging: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        attributionControl: false,
+      });
+
+      // @ts-ignore
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+      }).addTo(miniMap);
+    }
+
+    miniMap.setView([lat, lng], 11);
+
+    if (miniMarker) {
+      miniMarker.setLatLng([lat, lng]);
+    } else {
+      // @ts-ignore
+      miniMarker = L.circleMarker([lat, lng], {
+        radius: 6,
+        fillColor: '#7a4a2e',
+        color: '#7a4a2e',
+        weight: 1.5,
+        fillOpacity: 1,
+      }).addTo(miniMap);
+    }
+
+    setTimeout(() => miniMap.invalidateSize(), 10);
+  }
+
+  async function geocode(location: string): Promise<{ lat: number; lng: number } | null> {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+        const results = await res.json() as any[];
+        if (results.length > 0) {
+        return {
+            lat: parseFloat(results[0].lat),
+            lng: parseFloat(results[0].lon),
+        };
+      }
+    } catch {
+      // silent
+    }
+    return null;
+  }
+
+  locationInput.addEventListener('blur', async () => {
+    const value = locationInput.value.trim();
+    if (!value) {
+      resetLocation();
+      return;
+    }
+
+    geocodeResult.textContent = 'Locating…';
+    geocodeResult.className = 'geocode-result';
+    locationConfirm.classList.add('hidden');
+    confirmYes.classList.remove('confirmed');
+    locationConfirmed = false;
+    setSubmitState();
+
+    const coords = await geocode(value);
+    if (coords) {
+      resolvedCoords = coords;
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lng}&format=json`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const data = await res.json() as any;
+        const display = data.display_name || value;
+        const parts = display.split(',');
+        const short = parts.length > 2
+          ? `${parts[0].trim()}, ${parts[parts.length - 1].trim()}`
+          : display;
+        geocodeResult.textContent = `Found: ${short} — does this look right?`;
+      } catch {
+        geocodeResult.textContent = `Found: ${value} — does this look right?`;
+      }
+      geocodeResult.classList.add('found');
+      initMiniMap(coords.lat, coords.lng);
+      locationConfirm.classList.remove('hidden');
+    } else {
+      resolvedCoords = null;
+      locationMap.classList.add('hidden');
+      locationConfirm.classList.add('hidden');
+      geocodeResult.textContent = 'Location not found — sighting will be saved without map coordinates.';
+      geocodeResult.classList.add('notfound');
+      // No coords but location is filled — allow submit anyway
+      locationConfirmed = true;
+      setSubmitState();
+    }
+  });
+
+locationInput.addEventListener('input', () => {
+  resetLocation();
+});
+
+locationInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    locationInput.blur();
+  }
+});
+
+confirmYes.addEventListener('click', () => {
+  locationConfirmed = true;
+  confirmYes.classList.add('confirmed');
+  confirmNo.style.display = 'none';
+  geocodeResult.textContent = geocodeResult.textContent.replace('— does this look right?', '✓');
+  setSubmitState();
+});
+
+locationInput.addEventListener('focus', () => {
+  if (locationConfirmed) {
+    locationConfirmed = false;
+    confirmYes.classList.remove('confirmed');
+    confirmNo.style.display = '';
+    geocodeResult.textContent = geocodeResult.textContent.replace('✓', '— does this look right?');
+    setSubmitState();
+  }
+});
+
+  confirmNo.addEventListener('click', () => {
+    resetLocation();
+    locationInput.value = '';
+    locationInput.focus();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitButton.disabled = true;
+
+    const data = new FormData(form);
+
+    if (resolvedCoords) {
+      data.set('lat', String(resolvedCoords.lat));
+      data.set('lng', String(resolvedCoords.lng));
+    }
+
+    const photoFile = photoInput.files?.[0];
+    if (photoFile) {
+      submitButton.textContent = 'Compressing photo…';
+      try {
+        const compressed = await imageCompression(photoFile, {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1200,
+          useWebWorker: true,
+        });
+        data.set('photo', compressed, photoFile.name);
+      } catch {
+        data.set('photo', photoFile, photoFile.name);
+      }
+    }
+
+    submitButton.textContent = 'Sending…';
+
+    try {
+      const res = await fetch('/api/sightings', {
+        method: 'POST',
+        body: data,
+      });
+
+      if (res.ok) {
+        form.style.display = 'none';
+        status.textContent = 'Thank you. The note travels on.';
+      } else {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Add my sighting →';
+        status.textContent = 'Something went wrong. Please try again.';
+      }
+    } catch {
+      submitButton.disabled = false;
+      submitButton.textContent = 'Add my sighting →';
+      status.textContent = 'Something went wrong. Please try again.';
+    }
+  });
+
+  // Initial state — disable submit until location confirmed or empty
+  setSubmitState();
+</script>
+
+<style>
+  .form-section {
+    margin-bottom: 40px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  label {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--body);
+  }
+
+  .optional {
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  input[type="text"],
+  textarea {
+    background: var(--bg);
+    border: 0.5px solid var(--placeholder);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    color: var(--body);
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input[type="text"]::placeholder,
+  textarea::placeholder {
+    color: var(--placeholder);
+  }
+
+  input[type="text"]:focus,
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  input[type="file"] {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  button {
+    background: var(--accent);
+    color: var(--bg);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .status {
+    margin-top: 16px;
+    font-family: 'IM Fell English', Georgia, serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--muted);
+  }
+
+  .geocode-result {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    min-height: 16px;
+  }
+
+  .geocode-result.found {
+    color: var(--accent);
+  }
+
+  .geocode-result.notfound {
+    color: var(--muted);
+  }
+
+    .location-map {
+    width: 100%;
+    height: 180px;
+    border-radius: 6px;
+    border: 0.5px solid var(--divider);
+    margin-top: 8px;
+    }
+
+    .location-map.hidden {
+    display: none;
+    }
+
+    .location-confirm {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.location-confirm.hidden {
+  display: none;
+}
+
+.location-confirm button {
+  background: none;
+  border: 0.5px solid var(--placeholder);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--body);
+  cursor: pointer;
+  margin-top: 0;
+}
+
+.location-confirm button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.location-confirm button#confirm-yes.confirmed {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+</style>

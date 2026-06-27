@@ -1,0 +1,53 @@
+---
+interface Props {
+  title?: string;
+}
+const { title = 'youfoundthis.club' } = Astro.props;
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  :root {
+    --bg:          #f7f4ef;
+    --ink:         #1a1714;
+    --body:        #4a3f38;
+    --muted:       #a09488;
+    --placeholder: #c4b8ac;
+    --divider:     #ddd5c8;
+    --accent:      #7a4a2e;
+    --site-name:   #c4b8ac;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--body);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--bg);
+  }
+</style>

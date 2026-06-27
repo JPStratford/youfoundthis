@@ -1,0 +1,325 @@
+---
+import Base from '../layouts/Base.astro';
+import { env } from 'cloudflare:workers';
+import WorldMap from '../components/WorldMap.astro';
+
+const db = env.DB;
+
+const result = await db.prepare(`
+  SELECT n.id, n.origin_location, n.origin_date, COUNT(s.id) as sighting_count
+  FROM notes n
+  LEFT JOIN sightings s ON s.note_id = n.id
+  GROUP BY n.id
+  ORDER BY n.id ASC
+`).all();
+
+const notes = result.results as any[];
+
+const sightingsResult = await db.prepare(`
+  SELECT s.lat, s.lng, s.location, n.id as note_id
+  FROM sightings s
+  JOIN notes n ON n.id = s.note_id
+  WHERE s.lat IS NOT NULL AND s.lng IS NOT NULL
+`).all();
+
+const allSightings = sightingsResult.results as any[];
+---
+
+<Base title="youfoundthis.club">
+  <main>
+
+    <header>
+      <span class="site-name">youfoundthis.club</span>
+    </header>
+
+    <section class="intro">
+      <p class="opening">Somewhere, right now, a note is waiting to be found.</p>
+      <p class="body-text">
+        These are handwritten notes, left in public places for strangers.
+        Each one carries a number. If you find one, you're part of the story.
+        Add something, leave it somewhere new, and log your sighting.
+      </p>
+ </section>
+
+<WorldMap sightings={allSightings} />
+
+<hr />
+	
+    <hr />
+
+    <section class="notes-list">
+      <p class="section-label">notes in circulation</p>
+      {notes.map((n) => (
+        <a href={`/${n.id}`} class="note-row">
+          <span class="note-num">#{n.id}</span>
+          <span class="note-origin">{n.origin_location}</span>
+          <span class="note-count">{n.sighting_count} {n.sighting_count === 1 ? 'sighting' : 'sightings'}</span>
+        </a>
+      ))}
+    </section>
+
+    <hr />
+
+    <section class="contact">
+      <p class="section-label">get in touch</p>
+      <p class="contact-intro">Found a note? Lost one? Just curious? Say hello.</p>
+
+      <form id="contact-form">
+        <div class="field">
+          <label for="contact-name">Your name <span class="optional">optional</span></label>
+          <input type="text" id="contact-name" name="name" placeholder="Or stay anonymous" />
+        </div>
+
+        <div class="field">
+          <label for="contact-email">Email <span class="optional">optional</span></label>
+          <input type="email" id="contact-email" name="email" placeholder="If you'd like a reply" />
+        </div>
+
+        <div class="field">
+          <label for="contact-message">Message</label>
+          <textarea id="contact-message" name="message" rows="4" placeholder="What's on your mind?" required></textarea>
+        </div>
+
+        <button type="submit">Send →</button>
+        <p class="status" id="contact-status"></p>
+      </form>
+    </section>
+
+    <footer>
+      <span>youfoundthis.club</span>
+    </footer>
+
+  </main>
+</Base>
+
+<script define:vars={{ web3formsKey: import.meta.env.PUBLIC_WEB3FORMS_KEY }}>
+  const form = document.getElementById('contact-form');
+  const status = document.getElementById('contact-status');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const button = form.querySelector('button');
+    button.disabled = true;
+    button.textContent = 'Sending…';
+
+    const data = new FormData(form);
+    data.append('access_key', web3formsKey);
+
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        body: data,
+      });
+
+      if (res.ok) {
+        form.style.display = 'none';
+		status.textContent = "Thank you. I'll be in touch.";
+      } else {
+        button.disabled = false;
+        button.textContent = 'Send →';
+        status.textContent = 'Something went wrong. Please try again.';
+      }
+    } catch {
+      button.disabled = false;
+      button.textContent = 'Send →';
+      status.textContent = 'Something went wrong. Please try again.';
+    }
+  });
+</script>
+
+<style>
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header {
+    margin-bottom: 48px;
+  }
+
+  .site-name {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--site-name);
+    text-transform: lowercase;
+  }
+
+  .intro {
+    margin-bottom: 40px;
+  }
+
+  .opening {
+    font-family: 'IM Fell English', Georgia, serif;
+    font-style: italic;
+    font-size: 46px;
+    line-height: 1.2;
+    color: var(--ink);
+    margin-bottom: 20px;
+  }
+
+  .body-text {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--body);
+    max-width: 480px;
+  }
+
+  hr {
+    border: none;
+    border-top: 0.5px solid var(--divider);
+    margin: 40px 0;
+  }
+
+  .section-label {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 8px;
+  }
+
+  .note-row {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 0.5px solid var(--divider);
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .note-row:first-of-type {
+    border-top: 0.5px solid var(--divider);
+  }
+
+  .note-row:hover .note-num {
+    color: var(--accent);
+  }
+
+  .note-num {
+    font-family: 'IM Fell English', Georgia, serif;
+    font-size: 15px;
+    color: var(--accent);
+    flex-shrink: 0;
+    width: 40px;
+  }
+
+  .note-origin {
+    font-family: 'IM Fell English', Georgia, serif;
+    font-size: 15px;
+    color: var(--ink);
+    flex-grow: 1;
+  }
+
+  .note-count {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .contact-intro {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    color: var(--body);
+    margin-bottom: 24px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  label {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--body);
+  }
+
+  .optional {
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  textarea {
+    background: var(--bg);
+    border: 0.5px solid var(--placeholder);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    color: var(--body);
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input[type="text"]::placeholder,
+  input[type="email"]::placeholder,
+  textarea::placeholder {
+    color: var(--placeholder);
+  }
+
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  button {
+    background: var(--accent);
+    color: var(--bg);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .status {
+    margin-top: 16px;
+    font-family: 'IM Fell English', Georgia, serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--muted);
+  }
+
+  footer {
+    margin-top: 80px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    color: var(--site-name);
+    text-align: center;
+  }
+</style>
