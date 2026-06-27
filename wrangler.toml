@@ -8,7 +8,7 @@ binding = "ASSETS"
 
 [[kv_namespaces]]
 binding = "SESSION_DISABLED"
-id = "ffffffffffffffffffffffffffffffff"
+id = "1f3cfab13e0243ba9fd0eb66624e5ef4"
 
 [[d1_databases]]
 binding = "DB"
