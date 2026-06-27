@@ -6,6 +6,10 @@ compatibility_flags = ["nodejs_compat"]
 directory = "./dist"
 binding = "ASSETS"
 
+[[kv_namespaces]]
+binding = "SESSION_DISABLED"
+id = "ffffffffffffffffffffffffffffffff"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "youfoundthis"
