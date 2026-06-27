@@ -12,7 +12,7 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.0.0",
+    "@astrojs/cloudflare": "^14.0.1",
     "astro": "^7.0.2",
     "browser-image-compression": "^2.0.2"
   },
