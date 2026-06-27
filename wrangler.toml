@@ -1,6 +1,10 @@
 name = "youfoundthis"
 compatibility_date = "2024-04-03"
-pages_build_output_dir = "dist"
+compatibility_flags = ["nodejs_compat"]
+main = "dist/server/index.js"
+
+[assets]
+directory = "./dist"
 
 [[d1_databases]]
 binding = "DB"
