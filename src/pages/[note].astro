@@ -5,13 +5,28 @@ import SubmissionForm from '../components/SubmissionForm.astro';
 import JourneyMap from '../components/JourneyMap.astro';
 import { getSightingsForNote } from '../lib/sightings';
 
+interface NoteData {
+  id: number;
+  text: string;
+  origin_location: string;
+  origin_date: string;
+  origin_lat: number | null;
+  origin_lng: number | null;
+  created_at: string | null;
+}
+
 const { note } = Astro.params;
+
+if (!note) {
+  return Astro.redirect('/404');
+}
+
 import { env } from 'cloudflare:workers';
 const db = env.DB;
 
 const noteData = await db.prepare(
   'SELECT * FROM notes WHERE id = ?'
-).bind(note).first();
+).bind(note).first<NoteData>();
 
 if (!noteData) {
   return Astro.redirect('/404');
@@ -39,7 +54,12 @@ const origin = sightings[0];
   Originally left in {noteData.origin_location} · {noteData.origin_date}
 </p>
 
-<JourneyMap sightings={sightings} />
+<JourneyMap
+  sightings={sightings}
+  originLat={noteData.origin_lat}
+  originLng={noteData.origin_lng}
+  originLabel={noteData.origin_location}
+/>
 
 <hr />
 

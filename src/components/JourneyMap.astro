@@ -8,10 +8,14 @@ interface Sighting {
 
 interface Props {
   sightings: Sighting[];
+  originLat?: number | null;
+  originLng?: number | null;
+  originLabel?: string | null;
 }
 
-const { sightings } = Astro.props;
+const { sightings, originLat, originLng, originLabel } = Astro.props;
 const mapped = sightings.filter(s => s.lat && s.lng);
+const hasOrigin = originLat != null && originLng != null;
 ---
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -19,7 +23,7 @@ const mapped = sightings.filter(s => s.lat && s.lng);
 
 <div id="journey-map"></div>
 
-<script define:vars={{ mapped }}>
+<script define:vars={{ mapped, originLat, originLng, originLabel, hasOrigin }}>
   function initMap() {
     if (typeof L === 'undefined') {
       setTimeout(initMap, 100);
@@ -32,14 +36,30 @@ const mapped = sightings.filter(s => s.lat && s.lng);
     });
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap contributors © CARTO',
-    maxZoom: 19,
+      attribution: '© OpenStreetMap contributors © CARTO',
+      maxZoom: 19,
     }).addTo(map);
 
-    const coords = mapped.map(s => [s.lat, s.lng]);
+    const allCoords = [];
 
-    if (coords.length > 1) {
-      L.polyline(coords, {
+    if (hasOrigin) {
+      allCoords.push([originLat, originLng]);
+      L.circleMarker([originLat, originLng], {
+        radius: 5,
+        fillColor: '#f7f4ef',
+        color: '#7a4a2e',
+        weight: 1.5,
+        fillOpacity: 1,
+      }).addTo(map).bindPopup(
+        `<span style="font-family: 'IM Fell English', Georgia, serif; font-size: 14px;">${originLabel || 'Left here'}</span>`
+      );
+    }
+
+    const sightingCoords = mapped.map(s => [s.lat, s.lng]);
+    allCoords.push(...sightingCoords);
+
+    if (allCoords.length > 1) {
+      L.polyline(allCoords, {
         color: '#7a4a2e',
         weight: 1.5,
         opacity: 0.6,
@@ -60,10 +80,10 @@ const mapped = sightings.filter(s => s.lat && s.lng);
       );
     });
 
-    if (coords.length > 1) {
-      map.fitBounds(coords, { padding: [32, 32] });
-    } else if (coords.length === 1) {
-      map.setView(coords[0], 10);
+    if (allCoords.length > 1) {
+      map.fitBounds(allCoords, { padding: [32, 32] });
+    } else if (allCoords.length === 1) {
+      map.setView(allCoords[0], 10);
     }
   }
 

@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS notes (
   text TEXT NOT NULL,
   origin_location TEXT NOT NULL,
   origin_date TEXT NOT NULL,
+  origin_lat REAL,
+  origin_lng REAL,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -17,4 +19,5 @@ CREATE TABLE IF NOT EXISTS sightings (
   lng REAL,
   created_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (note_id) REFERENCES notes(id)
+  
 );
