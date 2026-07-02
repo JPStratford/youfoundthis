@@ -3,6 +3,7 @@ import Base from '../layouts/Base.astro';
 import Timeline from '../components/Timeline.astro';
 import SubmissionForm from '../components/SubmissionForm.astro';
 import JourneyMap from '../components/JourneyMap.astro';
+import { getSightingsForNote } from '../lib/sightings';
 
 const { note } = Astro.params;
 import { env } from 'cloudflare:workers';
@@ -16,11 +17,7 @@ if (!noteData) {
   return Astro.redirect('/404');
 }
 
-const result = await db.prepare(
-  'SELECT * FROM sightings WHERE note_id = ? ORDER BY created_at ASC'
-).bind(note).all();
-
-const sightings = result.results as any[];
+const sightings = await getSightingsForNote(db, note);
 const origin = sightings[0];
 ---
 

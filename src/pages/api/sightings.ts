@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
+import { getSightingsForNote } from '../../lib/sightings';
 
 export const GET: APIRoute = async ({ request }) => {
   const db = env.DB;
@@ -24,11 +25,9 @@ export const GET: APIRoute = async ({ request }) => {
     });
   }
 
-  const sightings = await db.prepare(
-    'SELECT * FROM sightings WHERE note_id = ? ORDER BY created_at ASC'
-  ).bind(noteId).all();
+  const sightings = await getSightingsForNote(db, noteId);
 
-  return new Response(JSON.stringify({ note, sightings: sightings.results }), {
+  return new Response(JSON.stringify({ note, sightings }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
@@ -45,7 +44,7 @@ export const POST: APIRoute = async ({ request }) => {
   const message = data.get('message') || null;
   const lat = data.get('lat') || null;
   const lng = data.get('lng') || null;
-  const photo = data.get('photo') as File | null;
+  const photoFiles = data.getAll('photos') as File[];
 
   if (!noteId || !location) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -54,28 +53,35 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  // Handle photo upload to R2
-  let photoKey: string | null = null;
-
-  if (photo && photo.size > 0) {
-    if (photo.size > 5 * 1024 * 1024) {
-      return new Response(JSON.stringify({ error: 'Photo must be under 5MB' }), {
+  for (const file of photoFiles) {
+    if (file && file.size > 5 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: 'Each photo must be under 5MB' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
-
-    const ext = photo.name.split('.').pop() || 'jpg';
-    photoKey = `sightings/${noteId}/${crypto.randomUUID()}.${ext}`;
-
-    await photos.put(photoKey, await photo.arrayBuffer(), {
-      httpMetadata: { contentType: photo.type },
-    });
   }
 
-  await db.prepare(
-    'INSERT INTO sightings (note_id, location, name, message, photo_key, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).bind(noteId, location, name, message, photoKey, lat, lng).run();
+  const insertResult = await db.prepare(
+    'INSERT INTO sightings (note_id, location, name, message, lat, lng) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(noteId, location, name, message, lat, lng).run();
+
+  const sightingId = insertResult.meta.last_row_id;
+
+  for (const file of photoFiles) {
+    if (!file || file.size === 0) continue;
+
+    const ext = file.name.split('.').pop() || 'jpg';
+    const photoKey = `sightings/${noteId}/${crypto.randomUUID()}.${ext}`;
+
+    await photos.put(photoKey, await file.arrayBuffer(), {
+      httpMetadata: { contentType: file.type },
+    });
+
+    await db.prepare(
+      'INSERT INTO sighting_photos (sighting_id, photo_key) VALUES (?, ?)'
+    ).bind(sightingId, photoKey).run();
+  }
 
   return new Response(JSON.stringify({ success: true }), {
     status: 200,

@@ -5,7 +5,7 @@ interface Sighting {
   message: string | null;
   name: string | null;
   created_at: string | null;
-  photo_key: string | null;
+  photos: string[];
   lat: number | null;
   lng: number | null;
 }
@@ -17,7 +17,6 @@ interface Props {
 const { sightings } = Astro.props;
 
 function photoUrl(key: string): string {
-  // key is "sightings/29/uuid.jpg" — strip "sightings/" prefix
   const stripped = key.replace(/^sightings\//, '');
   return `/api/photos/${stripped}`;
 }
@@ -37,14 +36,18 @@ function photoUrl(key: string): string {
           <p class="place">{s.location}</p>
           <p class="meta">{s.created_at ? new Date(s.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : ''}{s.name ? ` · ${s.name}` : ''}</p>
           {s.message && <p class="message">{s.message}</p>}
-            {s.photo_key && (
-            <img
-                src={photoUrl(s.photo_key)}
-                alt={`Photo from ${s.location}`}
-                class="sighting-photo"
-                data-lightbox={photoUrl(s.photo_key)}
-            />
-            )}
+          {s.photos.length > 0 && (
+            <div class="photo-grid">
+              {s.photos.map((key) => (
+                <img
+                  src={photoUrl(key)}
+                  alt={`Photo from ${s.location}`}
+                  class="sighting-photo"
+                  data-lightbox={photoUrl(key)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     ))}
@@ -60,9 +63,9 @@ function photoUrl(key: string): string {
   </div>
 
   <div class="lightbox" id="lightbox">
-  <span class="lightbox-close">close</span>
-  <img src="" alt="" id="lightbox-img" />
-</div>
+    <span class="lightbox-close">close</span>
+    <img src="" alt="" id="lightbox-img" />
+  </div>
 
 <script>
   const lightbox = document.getElementById('lightbox') as HTMLDivElement;
@@ -180,13 +183,21 @@ function photoUrl(key: string): string {
     margin-bottom: 10px;
   }
 
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    max-width: 320px;
+    margin-top: 8px;
+  }
+
   .sighting-photo {
     display: block;
     width: 100%;
-    max-width: 320px;
+    aspect-ratio: 1;
+    object-fit: cover;
     border-radius: 4px;
     border: 0.5px solid var(--divider);
-    margin-top: 8px;
     cursor: pointer;
   }
 
@@ -227,5 +238,4 @@ function photoUrl(key: string): string {
     color: #c4b8ac;
     cursor: pointer;
   }
-
 </style>

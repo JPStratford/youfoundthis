@@ -51,12 +51,13 @@ const { note } = Astro.props;
     </div>
 
     <div class="field">
-      <label for="photo">Photo <span class="optional">optional</span></label>
+      <label for="photo">Photos <span class="optional">optional</span></label>
       <input
         type="file"
         id="photo"
-        name="photo"
+        name="photos"
         accept="image/*"
+        multiple
       />
     </div>
 
@@ -86,7 +87,6 @@ const { note } = Astro.props;
   let miniMarker: any = null;
 
   function setSubmitState() {
-    // Allow submit if: location is empty (no coords intended) or location is confirmed
     const locationEmpty = locationInput.value.trim() === '';
     submitButton.disabled = !locationEmpty && !locationConfirmed;
   }
@@ -201,7 +201,6 @@ const { note } = Astro.props;
       locationConfirm.classList.add('hidden');
       geocodeResult.textContent = 'Location not found — sighting will be saved without map coordinates.';
       geocodeResult.classList.add('notfound');
-      // No coords but location is filled — allow submit anyway
       locationConfirmed = true;
       setSubmitState();
     }
@@ -253,18 +252,21 @@ locationInput.addEventListener('focus', () => {
       data.set('lng', String(resolvedCoords.lng));
     }
 
-    const photoFile = photoInput.files?.[0];
-    if (photoFile) {
-      submitButton.textContent = 'Compressing photo…';
-      try {
-        const compressed = await imageCompression(photoFile, {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1200,
-          useWebWorker: true,
-        });
-        data.set('photo', compressed, photoFile.name);
-      } catch {
-        data.set('photo', photoFile, photoFile.name);
+    const photoFiles = Array.from(photoInput.files || []);
+    if (photoFiles.length > 0) {
+      submitButton.textContent = photoFiles.length > 1 ? 'Compressing photos…' : 'Compressing photo…';
+      data.delete('photos');
+      for (const file of photoFiles) {
+        try {
+          const compressed = await imageCompression(file, {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1200,
+            useWebWorker: true,
+          });
+          data.append('photos', compressed, file.name);
+        } catch {
+          data.append('photos', file, file.name);
+        }
       }
     }
 
@@ -279,6 +281,7 @@ locationInput.addEventListener('focus', () => {
       if (res.ok) {
         form.style.display = 'none';
         status.textContent = 'Thank you. The note travels on.';
+        setTimeout(() => window.location.reload(), 1800);
       } else {
         submitButton.disabled = false;
         submitButton.textContent = 'Add my sighting →';
@@ -291,7 +294,6 @@ locationInput.addEventListener('focus', () => {
     }
   });
 
-  // Initial state — disable submit until location confirmed or empty
   setSubmitState();
 </script>
 
