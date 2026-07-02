@@ -32,14 +32,11 @@ const origin = sightings[0];
       <span class="note-number">note {note}</span>
     </header>
 
-    <section class="note-text">
-      <p>
-        Hello friend, you found my note. In a world where we can connect more readily
-        than ever, we aren't reaching out to each other. This note was originally left
-        in Venice, Italy — for you, or whoever found it first. Add something. Leave it
-        somewhere. Visit youfoundthis.club/{note} to see where it's been.
-      </p>
-    </section>
+<section class="note-text">
+  {noteData.text.split('\n\n').map((paragraph: string) => (
+    <p>{paragraph}</p>
+  ))}
+</section>
 
 <p class="origin-line">
   Originally left in {noteData.origin_location} · {noteData.origin_date}
